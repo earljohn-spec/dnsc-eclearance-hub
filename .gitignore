@@ -41,8 +41,10 @@ data/*.json
 Thumbs.db
 
 # ===== LOGS & REPORTS =====
-logs/
-reports/
+logs/*
+!logs/.gitkeep
+reports/*
+!reports/.gitkeep
 *.log
 
 # ===== TESTING =====
