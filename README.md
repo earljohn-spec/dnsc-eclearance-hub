@@ -17,15 +17,13 @@ Python 3.11 · FastAPI · SQLite · Railway · JWT + bcrypt · HMAC-SHA256 · PW
 
 ## Team
 
-| Role | Owner | Key Deliverables |
-|---|---|---|
-| Project Lead / Architect | TBD | R3, R4, R18 |
-| API Developer | TBD | R5, R6, R7 |
-| Data Integration Engineer | TBD | R1, R2, R9, R10 |
-| Security Engineer | TBD | R11–R16 |
-| Front-end / QA Developer | TBD | R8, R17 |
-
-Extended support (Team B): DBA, DevOps, Technical Writer, UI/UX, Data Analyst — hats worn by Team A members. See `docs/TEAM.md`.
+| Role | Key Deliverables |
+|---|---|
+| Project Lead / Architect | R3, R4, R18 |
+| API Developer | R5, R6, R7 |
+| Data Integration Engineer | R1, R2, R9, R10 |
+| Security Engineer | R11–R16 |
+| Front-end / QA Developer | R8, R17 |
 
 ---
 
