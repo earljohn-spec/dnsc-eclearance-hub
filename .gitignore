@@ -1,0 +1,55 @@
+﻿# ===== SECRETS (CRITICAL - NEVER COMMIT) =====
+.env
+.env.local
+.env.production
+*.pem
+*.key
+
+# ===== PYTHON =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+venv/
+.venv/
+env/
+
+# ===== DATABASE =====
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+
+# ===== STARTER KIT DATA (TOO LARGE FOR GITHUB) =====
+data/*.xml
+data/*.csv
+data/*.json
+!data/.gitkeep
+
+# ===== IDE =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+
+# ===== LOGS & REPORTS =====
+logs/
+reports/
+*.log
+
+# ===== TESTING =====
+.coverage
+htmlcov/
+.pytest_cache/
+
+# ===== DEPLOYMENT =====
+*.tar.gz
+Dockerfile.local
