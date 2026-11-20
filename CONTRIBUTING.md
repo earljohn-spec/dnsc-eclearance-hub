@@ -1,33 +1,17 @@
-﻿# Contributing — DNSC e-Clearance Hub Workflow
+﻿# Contributing Guidelines - DNSC e-Clearance Hub
 
-## Workflow Standard: Trunk-Based Development
+## Workflow Strategy
+This project strictly adheres to single-branch Trunk-Based Development directly on `main`. All feature additions, bug fixes, and documentation updates are committed directly to `main` with clear, descriptive commit messages mapping to the 5 IT field roles.
 
-We commit directly to the `main` branch to ensure rapid integration across all five project roles. To maintain complete audit discipline for external evaluators, all commits must strictly follow the Conventional Commits specification.
+## Role Attribution Matrix
+| Role Scope | Designated Git Author Name | Designated Git Email |
+| :--- | :--- | :--- |
+| Project Lead / Architect | earljohn-spec | earljohnbplaza@gmail.com |
+| Security Engineer | jeboysuganob15-create | jeboysuganob15@gmail.com |
+| Data Integration Engineer | yorimendoza | mendozayori123@gmail.com |
+| API Developer / DevOps | API Developer | api.devops@dnsc.edu.ph |
+| Front-end / QA Developer | QA Front-end Engineer | qa.frontend@dnsc.edu.ph |
 
-## Commit Conventions
-
-Format: `<type>(<scope>): <short description>`
-
-Types:
-- `feat`: New feature or deliverable (e.g., `feat(security): implement Pydantic v2 schemas`)
-- `fix`: Bug fixes (e.g., `fix(api): correct role authorization check`)
-- `docs`: Documentation updates (e.g., `docs: update system architecture diagram`)
-- `chore`: Infrastructure, dependencies, or cleanup (e.g., `chore(devops): update requirements.txt`)
-
-## Role Assignments & Commit Scopes
-
-| Role | Primary Scopes | Key Files Owned |
-| ---- | -------------- | --------------- |
-| Project Lead / Architect | `docs`, `release` | `README.md`, `TRACEABILITY.md`, `docs/*.md` |
-| Security Engineer | `feat(security)`, `fix(security)` | `app/models/`, `app/security.py` |
-| Data Integration Engineer | `feat(data)`, `feat(scripts)` | `app/database.py`, `scripts/` |
-| API Developer (DevOps) | `feat(api)`, `chore(devops)` | `app/main.py`, `app/routers/`, `requirements.txt` |
-| Front-end / QA Developer | `feat(ui)`, `test(qa)` | `static/`, `tests/` |
-
-## Direct Push Etiquette
-
-1. Always pull latest before starting work: `git pull origin main`
-2. Test code locally before staging: `pytest tests/ -v`
-3. Stage specific files only (never `git add .` blindly): `git add app/security.py`
-4. Verify staged files before committing: `git diff --cached --stat`
-5. Commit with appropriate role prefix and push: `git push origin main`
+## Role Permissions Design (R14-R18)
+- **Role-Based Authorization:** Departmental staff roles (`ADMIN`, `ACCOUNTING_STAFF`, `REGISTRAR_STAFF`, `LIBRARY_STAFF`, `STUDENT_AFFAIRS_STAFF`) are authorized to create, view, and clear holds across institutional systems.
+- **Scope & Boundaries:** Authorization is role-based across all clearance source systems. Row-level hold ownership enforcement is handled at the institutional departmental interface layer.
