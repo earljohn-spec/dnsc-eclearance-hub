@@ -1,39 +1,33 @@
-# Contributing — Week 15 Workflow
+﻿# Contributing — DNSC e-Clearance Hub Workflow
 
-## Branch Protection
+## Workflow Standard: Trunk-Based Development
 
-The `main` branch is protected. All changes require a pull request.
+We commit directly to the `main` branch to ensure rapid integration across all five project roles. To maintain complete audit discipline for external evaluators, all commits must strictly follow the Conventional Commits specification.
 
-**Settings (GitHub → Settings → Branches → Add rule for `main`):**
+## Commit Conventions
 
-- Require a pull request before merging
-- Require approvals: 1
-- Require linear history
-- Do not allow bypassing the above settings
+Format: `<type>(<scope>): <short description>`
 
-At PR merge time, always choose **"Rebase and merge"**.
+Types:
+- `feat`: New feature or deliverable (e.g., `feat(security): implement Pydantic v2 schemas`)
+- `fix`: Bug fixes (e.g., `fix(api): correct role authorization check`)
+- `docs`: Documentation updates (e.g., `docs: update system architecture diagram`)
+- `chore`: Infrastructure, dependencies, or cleanup (e.g., `chore(devops): update requirements.txt`)
 
-## Branch Naming
+## Role Assignments & Commit Scopes
 
-| Pattern | Example              | Use                                |
-| ------- | -------------------- | ---------------------------------- |
-| feat/   | feat/auth-login      | New feature                        |
-| fix/    | fix/xml-parser       | Bug fix                            |
-| docs/   | docs/update-api-spec | Documentation only (self-merge OK) |
+| Role | Primary Scopes | Key Files Owned |
+| ---- | -------------- | --------------- |
+| Project Lead / Architect | `docs`, `release` | `README.md`, `TRACEABILITY.md`, `docs/*.md` |
+| Security Engineer | `feat(security)`, `fix(security)` | `app/models/`, `app/security.py` |
+| Data Integration Engineer | `feat(data)`, `feat(scripts)` | `app/database.py`, `scripts/` |
+| API Developer (DevOps) | `feat(api)`, `chore(devops)` | `app/main.py`, `app/routers/`, `requirements.txt` |
+| Front-end / QA Developer | `feat(ui)`, `test(qa)` | `static/`, `tests/` |
 
-## Workflow
+## Direct Push Etiquette
 
-1. **Sync before branching:**
-   ```bash
-   git checkout main
-   git pull --rebase origin main
-   git checkout -b feat/your-feature
-   ```
-2. **Commit in small units:**
-   ```bash
-   git add app/auth.py
-   git commit -m "Add bcrypt password hashing"
-
-```
-
-```
+1. Always pull latest before starting work: `git pull origin main`
+2. Test code locally before staging: `pytest tests/ -v`
+3. Stage specific files only (never `git add .` blindly): `git add app/security.py`
+4. Verify staged files before committing: `git diff --cached --stat`
+5. Commit with appropriate role prefix and push: `git push origin main`
