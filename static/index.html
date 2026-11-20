@@ -1,0 +1,376 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DNSC e-Clearance Hub</title>
+    <style>
+        :root {
+            --primary: #003366;
+            --primary-accent: #0055a5;
+            --success: #28a745;
+            --danger: #dc3545;
+            --warning: #ffc107;
+            --bg-gray: #f8f9fa;
+            --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-gray);
+            color: #333;
+        }
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: var(--card-shadow);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-accent); }
+        .btn-success { background: var(--success); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.3rem;
+            font-weight: 600;
+        }
+        .form-control {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f1f1f1;
+        }
+        .badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            color: white;
+            font-size: 0.85rem;
+        }
+        .badge-active { background: var(--danger); }
+        .badge-cleared { background: var(--success); }
+        .tab-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .tab-btn {
+            padding: 0.5rem 1rem;
+            background: #e9ecef;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .tab-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>DNSC e-Clearance Hub</h1>
+    <div id="auth-status">
+        <button class="btn btn-primary" onclick="showLoginModal()" id="login-btn">Staff Login</button>
+        <span id="user-info" style="display:none; color: white; font-weight:600;"></span>
+        <button class="btn btn-danger" onclick="logout()" id="logout-btn" style="display:none; margin-left: 1rem;">Logout</button>
+    </div>
+</header>
+
+<div class="container">
+    <!-- Student Status Lookup Section -->
+    <div class="card">
+        <h2>Student Clearance Status Lookup</h2>
+        <div style="display: flex; gap: 0.5rem;">
+            <input type="text" id="search-student-id" class="form-control" placeholder="Enter Student ID (e.g. 2026-0001)">
+            <button class="btn btn-primary" onclick="checkStatus()">Search</button>
+        </div>
+        <div id="status-result" style="margin-top: 1.5rem;"></div>
+    </div>
+
+    <!-- Staff Management Portal -->
+    <div class="card" id="staff-portal" style="display: none;">
+        <h2>Department Staff Management Portal</h2>
+        <div class="tab-buttons">
+            <button class="tab-btn active" onclick="switchTab('holds-tab')">Active Holds</button>
+            <button class="tab-btn" onclick="switchTab('create-tab')">Create Hold</button>
+            <button class="tab-btn" onclick="switchTab('import-tab')">Data Import</button>
+        </div>
+
+        <div id="holds-tab" class="tab-content">
+            <h3>Institutional Clearance Holds</h3>
+            <button class="btn btn-primary" onclick="loadHolds()">Refresh List</button>
+            <table id="holds-table">
+                <thead>
+                    <tr>
+                        <th>Hold ID</th>
+                        <th>Student ID</th>
+                        <th>Source System</th>
+                        <th>Type</th>
+                        <th>Amount Due</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="holds-tbody"></tbody>
+            </table>
+        </div>
+
+        <div id="create-tab" class="tab-content" style="display:none;">
+            <h3>Issue Clearance Hold</h3>
+            <form id="create-hold-form" onsubmit="handleCreateHold(event)">
+                <div class="form-group">
+                    <label>Student ID</label>
+                    <input type="text" id="hold-student-id" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Source System</label>
+                    <select id="hold-source" class="form-control" required>
+                        <option value="library">Library</option>
+                        <option value="registrar">Registrar</option>
+                        <option value="cashier">Cashier</option>
+                        <option value="student_affairs">Student Affairs</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Hold Type</label>
+                    <select id="hold-type" class="form-control" required>
+                        <option value="academic">Academic</option>
+                        <option value="financial">Financial</option>
+                        <option value="disciplinary">Disciplinary</option>
+                        <option value="administrative">Administrative</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <input type="text" id="hold-desc" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Amount Due (PHP)</label>
+                    <input type="number" step="0.01" id="hold-amount" class="form-control" value="0.00">
+                </div>
+                <button type="submit" class="btn btn-success">Issue Hold</button>
+            </form>
+        </div>
+
+        <div id="import-tab" class="tab-content" style="display:none;">
+            <h3>Bulk Data Feed Import</h3>
+            <form id="import-form" onsubmit="handleImport(event)">
+                <div class="form-group">
+                    <label>Source System</label>
+                    <select id="import-source" class="form-control" required>
+                        <option value="library">Library</option>
+                        <option value="registrar">Registrar</option>
+                        <option value="cashier">Cashier</option>
+                        <option value="student_affairs">Student Affairs</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Select CSV/JSON/XML File</label>
+                    <input type="file" id="import-file" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Process Import</button>
+            </form>
+            <div id="import-result" style="margin-top: 1rem;"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let authToken = localStorage.getItem('access_token');
+    let currentUser = localStorage.getItem('username');
+
+    if (authToken) {
+        setLoggedInState(currentUser);
+    }
+
+    function setLoggedInState(username) {
+        document.getElementById('login-btn').style.display = 'none';
+        document.getElementById('user-info').style.display = 'inline';
+        document.getElementById('user-info').innerText = `User: ${username}`;
+        document.getElementById('logout-btn').style.display = 'inline';
+        document.getElementById('staff-portal').style.display = 'block';
+        loadHolds();
+    }
+
+    function logout() {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('username');
+        location.reload();
+    }
+
+    async function showLoginModal() {
+        const username = prompt("Username:");
+        const password = prompt("Password:");
+        if (!username || !password) return;
+
+        try {
+            const res = await fetch('/api/v1/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            if (!res.ok) throw new Error("Invalid login credentials");
+            const data = await res.json();
+            localStorage.setItem('access_token', data.access_token);
+            localStorage.setItem('username', data.username);
+            setLoggedInState(data.username);
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    async function checkStatus() {
+        const studentId = document.getElementById('search-student-id').value.trim();
+        if (!studentId) return alert("Please enter a Student ID");
+
+        const res = await fetch(`/api/v1/clearance/status/${studentId}`);
+        const data = await res.json();
+        const div = document.getElementById('status-result');
+
+        if (data.cleared) {
+            div.innerHTML = `<div style="padding: 1rem; background: #d4edda; color: #155724; border-radius: 4px;">
+                <strong>CLEARED:</strong> ${data.message}
+            </div>`;
+        } else {
+            let holdsHtml = data.holds.map(h => `<li>[${h.source_system.toUpperCase()}] ${h.description} - ₱${h.amount_due}</li>`).join('');
+            div.innerHTML = `<div style="padding: 1rem; background: #f8d7da; color: #721c24; border-radius: 4px;">
+                <strong>UNCLEARED (${data.active_holds_count} Hold(s)):</strong> ${data.message}
+                <ul>${holdsHtml}</ul>
+            </div>`;
+        }
+    }
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).style.display = 'block';
+        event.target.classList.add('active');
+    }
+
+    async function loadHolds() {
+        if (!authToken) return;
+        const res = await fetch('/api/v1/holds', {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const holds = await res.json();
+        const tbody = document.getElementById('holds-tbody');
+        tbody.innerHTML = holds.map(h => `
+            <tr>
+                <td>${h.hold_id}</td>
+                <td>${h.student_id || 'N/A'}</td>
+                <td>${h.source_system}</td>
+                <td>${h.hold_type}</td>
+                <td>₱${h.amount_due}</td>
+                <td><span class="badge ${h.status === 'active' ? 'badge-active' : 'badge-cleared'}">${h.status}</span></td>
+                <td>${h.status === 'active' ? `<button class="btn btn-success" onclick="clearHold(${h.hold_id})">Clear</button>` : 'Cleared'}</td>
+            </tr>
+        `).join('');
+    }
+
+    async function clearHold(holdId) {
+        const res = await fetch(`/api/v1/holds/${holdId}/clear`, {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+            loadHolds();
+        } else {
+            alert("Failed to clear hold");
+        }
+    }
+
+    async function handleCreateHold(e) {
+        e.preventDefault();
+        const payload = {
+            student_id: document.getElementById('hold-student-id').value,
+            source_system: document.getElementById('hold-source').value,
+            hold_type: document.getElementById('hold-type').value,
+            description: document.getElementById('hold-desc').value,
+            amount_due: parseFloat(document.getElementById('hold-amount').value)
+        };
+
+        const res = await fetch('/api/v1/holds', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            alert("Hold created successfully");
+            switchTab('holds-tab');
+            loadHolds();
+        } else {
+            alert("Error creating hold");
+        }
+    }
+
+    async function handleImport(e) {
+        e.preventDefault();
+        const source = document.getElementById('import-source').value;
+        const fileInput = document.getElementById('import-file');
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        const res = await fetch(`/api/v1/import/${source}`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${authToken}` },
+            body: formData
+        });
+
+        const data = await res.json();
+        document.getElementById('import-result').innerText = JSON.stringify(data, null, 2);
+        loadHolds();
+    }
+</script>
+
+</body>
+</html>
