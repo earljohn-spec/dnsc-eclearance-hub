@@ -90,13 +90,13 @@ def init_db():
 
     cursor.execute("SELECT COUNT(*) FROM users;")
     if cursor.fetchone()[0] == 0:
-        from app.security import get_password_hash
+        from app.security import hash_password
         default_users = [
-            ('admin', get_password_hash('admin123'), UserRole.ADMIN.value, 'System Administrator'),
-            ('cashier_staff', get_password_hash('staff123'), UserRole.ACCOUNTING_STAFF.value, 'Accounting Staff'),
-            ('registrar_staff', get_password_hash('staff123'), UserRole.REGISTRAR_STAFF.value, 'Registrar Staff'),
-            ('library_staff', get_password_hash('staff123'), UserRole.LIBRARY_STAFF.value, 'Library Staff'),
-            ('sa_staff', get_password_hash('staff123'), UserRole.STUDENT_AFFAIRS_STAFF.value, 'Student Affairs Staff')
+            ('admin', hash_password('admin123'), UserRole.ADMIN.value, 'System Administrator'),
+            ('cashier_staff', hash_password('staff123'), UserRole.ACCOUNTING_STAFF.value, 'Accounting Staff'),
+            ('registrar_staff', hash_password('staff123'), UserRole.REGISTRAR_STAFF.value, 'Registrar Staff'),
+            ('library_staff', hash_password('staff123'), UserRole.LIBRARY_STAFF.value, 'Library Staff'),
+            ('sa_staff', hash_password('staff123'), UserRole.STUDENT_AFFAIRS_STAFF.value, 'Student Affairs Staff')
         ]
         cursor.executemany(
             "INSERT INTO users (username, password_hash, role, full_name) VALUES (?, ?, ?, ?)",
