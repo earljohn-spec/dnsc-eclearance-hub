@@ -46,7 +46,7 @@ def test_login_and_cross_department_clearance_denial():
         headers={"Authorization": f"Bearer {lib_token}"}
     )
     assert clear_denied.status_code == 403
-    assert "cannot alter holds" in clear_denied.json()["detail"].lower()
+    assert "is not authorized to alter holds" in clear_denied.json()["detail"].lower()
 
     # Positive Test: Cashier Staff clears their own department hold -> 200 OK
     clear_allowed = client.put(

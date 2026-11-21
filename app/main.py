@@ -97,12 +97,15 @@ def login(payload: LoginRequest, db: sqlite3.Connection = Depends(get_db)):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    token = create_access_token(data={"sub": user["username"], "role": user["role"], "user_id": user["user_id"]})
+    token = create_access_token(
+        subject=user["username"],
+        role=UserRole(user["role"])
+    )
     return LoginResponse(
         access_token=token,
         token_type="bearer",
         username=user["username"],
-        role=user["role"],
+        role=UserRole(user["role"]),
         full_name=user["full_name"]
     )
 
@@ -216,8 +219,10 @@ def create_hold(
     )
     hold_id = cursor.lastrowid
 
-    # Atomic Audit Log Insertion
-    actor_id = current_user.get("user_id", 1)
+    cursor.execute("SELECT user_id FROM users WHERE username = ?", (current_user.get("sub"),))
+    actor_row = cursor.fetchone()
+    actor_id = actor_row["user_id"] if actor_row else 1
+
     client_ip = request.client.host if request.client else "127.0.0.1"
     new_val_json = json.dumps({"student_id": payload.student_id, "source": payload.source_system.value, "amount": payload.amount_due})
 
@@ -259,7 +264,6 @@ def clear_hold(
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Hold ID {hold_id} not found")
 
-    # Enforce Departmental Row-Level Scoping
     try:
         user_role_enum = UserRole(current_user.get("role"))
     except ValueError:
@@ -282,8 +286,10 @@ def clear_hold(
         (hold_id,)
     )
 
-    # Atomic Audit Log Insertion
-    actor_id = current_user.get("user_id", 1)
+    cursor.execute("SELECT user_id FROM users WHERE username = ?", (current_user.get("sub"),))
+    actor_row = cursor.fetchone()
+    actor_id = actor_row["user_id"] if actor_row else 1
+
     client_ip = request.client.host if request.client else "127.0.0.1"
     old_val_json = json.dumps({"status": row["status"]})
     new_val_json = json.dumps({"status": "cleared"})
