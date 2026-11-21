@@ -3,10 +3,24 @@ from app.models.schemas import UserRole
 
 DB_PATH = "eclearance.db"
 
+def get_db_connection():
+    conn = sqlite3.connect(DB_PATH, timeout=20.0)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON;")
+    conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA synchronous = FULL;")
+    return conn
+
+def get_db():
+    conn = get_db_connection()
+    try:
+        yield conn
+    finally:
+        conn.close()
+
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("PRAGMA foreign_keys = ON;")
     
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
@@ -91,14 +105,3 @@ def init_db():
 
     conn.commit()
     conn.close()
-
-def get_db():
-    conn = sqlite3.connect(DB_PATH, timeout=20.0)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON;")
-    conn.execute("PRAGMA journal_mode = WAL;")
-    conn.execute("PRAGMA synchronous = FULL;")
-    try:
-        yield conn
-    finally:
-        conn.close()
