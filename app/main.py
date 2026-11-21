@@ -1,12 +1,13 @@
-﻿import sqlite3
+﻿import json
+import sqlite3
 from typing import List, Dict, Any, Optional
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Path as ApiPath, Query
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Path as ApiPath, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 
-from app.database import init_db, get_db
+from app.database import init_db, get_db, DB_PATH
 from app.models.schemas import (
     LoginRequest,
     LoginResponse,
@@ -31,6 +32,21 @@ from app.services.import_pipeline import process_import_file
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE import_jobs 
+            SET status = 'interrupted', 
+                error_message = COALESCE(error_message, 'Process terminated during server restart'),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE status IN ('running', 'queued')
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
     yield
 
 app = FastAPI(
@@ -81,7 +97,7 @@ def login(payload: LoginRequest, db: sqlite3.Connection = Depends(get_db)):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    token = create_access_token(data={"sub": user["username"], "role": user["role"]})
+    token = create_access_token(data={"sub": user["username"], "role": user["role"], "user_id": user["user_id"]})
     return LoginResponse(
         access_token=token,
         token_type="bearer",
@@ -173,11 +189,24 @@ STAFF_ROLES = [
 @app.post("/api/v1/holds", response_model=HoldingResponse, status_code=status.HTTP_201_CREATED, tags=["Holds"])
 def create_hold(
     payload: HoldingUpdateRequest,
+    request: Request,
     current_user: dict = Depends(RoleChecker(STAFF_ROLES)),
     db: sqlite3.Connection = Depends(get_db)
 ):
-    cursor = db.cursor()
+    try:
+        user_role_enum = UserRole(current_user.get("role"))
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid user role credential")
 
+    if user_role_enum != UserRole.ADMIN:
+        allowed_source = user_role_enum.allowed_source_system
+        if not allowed_source or payload.source_system != allowed_source:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Role '{user_role_enum.value}' is not authorized to create holds for department '{payload.source_system.value}'"
+            )
+
+    cursor = db.cursor()
     cursor.execute(
         """
         INSERT INTO clearance_holds (student_id, source_system, hold_type, description, amount_due, status)
@@ -185,9 +214,22 @@ def create_hold(
         """,
         (payload.student_id, payload.source_system.value, payload.hold_type.value, payload.description, payload.amount_due)
     )
-    db.commit()
     hold_id = cursor.lastrowid
-    
+
+    # Atomic Audit Log Insertion
+    actor_id = current_user.get("user_id", 1)
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    new_val_json = json.dumps({"student_id": payload.student_id, "source": payload.source_system.value, "amount": payload.amount_due})
+
+    cursor.execute(
+        """
+        INSERT INTO audit_logs (actor_user_id, action, entity_type, entity_id, old_values_json, new_values_json, ip_address)
+        VALUES (?, 'HOLD_CREATED', 'clearance_holds', ?, NULL, ?, ?)
+        """,
+        (actor_id, hold_id, new_val_json, client_ip)
+    )
+    db.commit()
+
     cursor.execute("SELECT hold_id, student_id, source_system, hold_type, description, amount_due, status, created_at FROM clearance_holds WHERE hold_id = ?", (hold_id,))
     row = cursor.fetchone()
 
@@ -205,6 +247,7 @@ def create_hold(
 
 @app.put("/api/v1/holds/{hold_id}/clear", response_model=HoldingResponse, tags=["Holds"])
 def clear_hold(
+    request: Request,
     hold_id: int = ApiPath(..., description="Hold record identifier"),
     current_user: dict = Depends(RoleChecker(STAFF_ROLES)),
     db: sqlite3.Connection = Depends(get_db)
@@ -216,6 +259,20 @@ def clear_hold(
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Hold ID {hold_id} not found")
 
+    # Enforce Departmental Row-Level Scoping
+    try:
+        user_role_enum = UserRole(current_user.get("role"))
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid user role credential")
+
+    if user_role_enum != UserRole.ADMIN:
+        allowed_source = user_role_enum.allowed_source_system
+        if not allowed_source or row["source_system"] != allowed_source.value:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Departmental role '{user_role_enum.value}' is not authorized to alter holds from '{row['source_system']}'"
+            )
+
     cursor.execute(
         """
         UPDATE clearance_holds
@@ -223,6 +280,20 @@ def clear_hold(
         WHERE hold_id = ?
         """,
         (hold_id,)
+    )
+
+    # Atomic Audit Log Insertion
+    actor_id = current_user.get("user_id", 1)
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    old_val_json = json.dumps({"status": row["status"]})
+    new_val_json = json.dumps({"status": "cleared"})
+
+    cursor.execute(
+        """
+        INSERT INTO audit_logs (actor_user_id, action, entity_type, entity_id, old_values_json, new_values_json, ip_address)
+        VALUES (?, 'HOLD_CLEARED', 'clearance_holds', ?, ?, ?, ?)
+        """,
+        (actor_id, hold_id, old_val_json, new_val_json, client_ip)
     )
     db.commit()
 

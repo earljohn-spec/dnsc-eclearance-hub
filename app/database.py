@@ -1,35 +1,13 @@
-﻿import os
-import sqlite3
-from pathlib import Path
-from typing import Generator
-from app.security import hash_password
+﻿import sqlite3
+from app.models.schemas import UserRole
 
-DB_PATH = os.getenv("DATABASE_PATH", "data/clearance.db")
+DB_PATH = "eclearance.db"
 
-def get_db_path() -> Path:
-    path = Path(DB_PATH)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    return path
-
-def get_db_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(get_db_path())
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON;")
-    return conn
-
-def get_db() -> Generator[sqlite3.Connection, None, None]:
-    conn = get_db_connection()
-    try:
-        yield conn
-    finally:
-        conn.close()
-
-def init_db() -> None:
-    conn = get_db_connection()
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-
-    cursor.execute("PRAGMA journal_mode = WAL;")
-
+    cursor.execute("PRAGMA foreign_keys = ON;")
+    
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
         user_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,7 +15,6 @@ def init_db() -> None:
         password_hash TEXT NOT NULL,
         role TEXT NOT NULL,
         full_name TEXT NOT NULL,
-        email TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     """)
@@ -50,20 +27,9 @@ def init_db() -> None:
         hold_type TEXT NOT NULL,
         description TEXT NOT NULL,
         amount_due REAL DEFAULT 0.0,
-        status TEXT NOT NULL DEFAULT 'active',
+        status TEXT DEFAULT 'active',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         cleared_at TIMESTAMP
-    );
-    """)
-
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS student_affairs_records (
-        record_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        student_id TEXT NOT NULL,
-        violation_type TEXT NOT NULL,
-        sanction TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'pending',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     """)
 
@@ -71,29 +37,68 @@ def init_db() -> None:
     CREATE TABLE IF NOT EXISTS import_logs (
         log_id INTEGER PRIMARY KEY AUTOINCREMENT,
         source_system TEXT NOT NULL,
-        records_processed INTEGER NOT NULL,
-        records_successful INTEGER NOT NULL,
-        records_failed INTEGER NOT NULL,
-        errors_json TEXT NOT NULL,
+        records_imported INTEGER NOT NULL,
         imported_by TEXT NOT NULL,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        filename TEXT NOT NULL,
+        status TEXT NOT NULL,
+        message TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     """)
 
-    cursor.execute("SELECT user_id FROM users WHERE username = ?", ("admin",))
-    if not cursor.fetchone():
-        admin_pw = os.getenv("ADMIN_BOOTSTRAP_PASSWORD", "AdminSecurePass2026!")
-        admin_password_hash = hash_password(admin_pw)
-        cursor.execute(
-            """
-            INSERT INTO users (username, password_hash, role, full_name, email)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            ("admin", admin_password_hash, "admin", "System Administrator", "admin@dnsc.edu.ph"),
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS import_jobs (
+        job_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source_system TEXT NOT NULL,
+        imported_by TEXT NOT NULL,
+        filename TEXT NOT NULL,
+        status TEXT NOT NULL,
+        error_message TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS audit_logs (
+        audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        actor_user_id INTEGER NOT NULL,
+        action TEXT NOT NULL,
+        entity_type TEXT NOT NULL,
+        entity_id INTEGER NOT NULL,
+        old_values_json TEXT,
+        new_values_json TEXT,
+        ip_address TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (actor_user_id) REFERENCES users (user_id)
+    );
+    """)
+
+    cursor.execute("SELECT COUNT(*) FROM users;")
+    if cursor.fetchone()[0] == 0:
+        from app.security import get_password_hash
+        default_users = [
+            ('admin', get_password_hash('admin123'), UserRole.ADMIN.value, 'System Administrator'),
+            ('cashier_staff', get_password_hash('staff123'), UserRole.ACCOUNTING_STAFF.value, 'Accounting Staff'),
+            ('registrar_staff', get_password_hash('staff123'), UserRole.REGISTRAR_STAFF.value, 'Registrar Staff'),
+            ('library_staff', get_password_hash('staff123'), UserRole.LIBRARY_STAFF.value, 'Library Staff'),
+            ('sa_staff', get_password_hash('staff123'), UserRole.STUDENT_AFFAIRS_STAFF.value, 'Student Affairs Staff')
+        ]
+        cursor.executemany(
+            "INSERT INTO users (username, password_hash, role, full_name) VALUES (?, ?, ?, ?)",
+            default_users
         )
 
     conn.commit()
     conn.close()
 
-if __name__ == "__main__":
-    init_db()
+def get_db():
+    conn = sqlite3.connect(DB_PATH, timeout=20.0)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON;")
+    conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA synchronous = FULL;")
+    try:
+        yield conn
+    finally:
+        conn.close()

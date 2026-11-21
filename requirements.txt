@@ -1,1 +1,3 @@
 ﻿python-multipart
+pytest
+httpx

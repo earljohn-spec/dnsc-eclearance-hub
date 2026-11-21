@@ -1,128 +1,186 @@
-﻿"""
-Pydantic v2 Schemas and Enums for DNSC e-Clearance Hub
-Requirements covered: R5-R8, R11-R13
-"""
-
-from enum import Enum
-from typing import List, Optional
-from datetime import datetime
-from pydantic import BaseModel, Field, ConfigDict
+﻿from enum import Enum
+from typing import List, Optional, Dict, Any
+from pydantic import BaseModel, Field
 
 
 class UserRole(str, Enum):
-    STUDENT = "student"
-    LIBRARY_STAFF = "library_staff"
+    ADMIN = "admin"
     ACCOUNTING_STAFF = "accounting_staff"
     REGISTRAR_STAFF = "registrar_staff"
+    LIBRARY_STAFF = "library_staff"
     STUDENT_AFFAIRS_STAFF = "student_affairs_staff"
-    ADMIN = "admin"
+    STUDENT = "student"
 
-
-class HoldStatus(str, Enum):
-    CLEARED = "cleared"
-    UNCLEARED = "uncleared"
+    @property
+    def allowed_source_system(self) -> Optional["SourceSystem"]:
+        return ROLE_TO_SOURCE_SYSTEM.get(self)
 
 
 class SourceSystem(str, Enum):
     LIBRARY = "library"
-    ACCOUNTING = "accounting"
     REGISTRAR = "registrar"
+    CASHIER = "cashier"
     STUDENT_AFFAIRS = "student_affairs"
 
 
 class HoldType(str, Enum):
-    OVERDUE_BOOKS = "overdue_books"
-    UNPAID_FEES = "unpaid_fees"
-    MISSING_DOCUMENT = "missing_document"
-    DISCIPLINARY_ACTION = "disciplinary_action"
+    ACADEMIC = "academic"
+    FINANCIAL = "financial"
+    DISCIPLINARY = "disciplinary"
+    ADMINISTRATIVE = "administrative"
+
+
+class HoldStatus(str, Enum):
+    ACTIVE = "active"
+    CLEARED = "cleared"
 
 
 class ReportFormat(str, Enum):
     CSV = "csv"
     JSON = "json"
+    XML = "xml"
+    PDF = "pdf"
+
+
+ROLE_TO_SOURCE_SYSTEM: Dict[UserRole, SourceSystem] = {
+    UserRole.LIBRARY_STAFF: SourceSystem.LIBRARY,
+    UserRole.ACCOUNTING_STAFF: SourceSystem.CASHIER,
+    UserRole.REGISTRAR_STAFF: SourceSystem.REGISTRAR,
+    UserRole.STUDENT_AFFAIRS_STAFF: SourceSystem.STUDENT_AFFAIRS,
+}
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
+    role: Optional[UserRole] = None
+    user_id: Optional[int] = None
+
+
+class UserBase(BaseModel):
+    username: str
+    role: UserRole
+    full_name: str
+
+
+class UserCreate(UserBase):
+    password: str
+
+
+class UserResponse(UserBase):
+    user_id: int
+    created_at: str
 
 
 class LoginRequest(BaseModel):
-    user_id: str = Field(..., description="Student ID (dddd-ddddd) or Staff username")
-    password: str = Field(..., min_length=1)
+    username: str = Field(..., min_length=3, max_length=50, description="System username")
+    password: str = Field(..., min_length=6, description="User password")
 
 
 class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    username: str
     role: UserRole
-    expires_in: int = Field(default=3600, description="Token validity in seconds (1 hour)")
+    full_name: str
 
 
 class HoldSummary(BaseModel):
+    hold_id: int
     source_system: SourceSystem
+    hold_type: HoldType
+    description: str
+    amount_due: float
     status: HoldStatus
-    count: int = Field(ge=0)
-    total_amount: float = Field(default=0.0, ge=0.0)
-    remarks: Optional[str] = None
+    created_at: str
 
 
 class ClearanceStatusResponse(BaseModel):
-    student_id: str = Field(..., description="Masked format (YYYY-****-NN) for student views")
-    full_name: str
-    program: str
-    overall_status: HoldStatus
+    student_id: str
+    cleared: bool
+    active_holds_count: int
     holds: List[HoldSummary]
-    computed_at: datetime
-
-
-class DeadlineResponse(BaseModel):
-    clearance_deadline: str = Field(..., description="ISO 8601 date YYYY-MM-DD")
-    days_remaining: int
-    is_holiday: bool
-    holiday_name: Optional[str] = None
-    status: str
-
-
-class SlipResponse(BaseModel):
-    verification_token: str
-    qr_code_data: str
-    issue_date: datetime
-    valid_until: datetime
-
-
-class VerifyResponse(BaseModel):
-    valid: bool
-    student_id: Optional[str] = None
-    student_name: Optional[str] = None
-    program: Optional[str] = None
-    overall_status: Optional[HoldStatus] = None
-    verified_at: datetime
-
-
-class HoldingUpdateRequest(BaseModel):
-    status: HoldStatus
-    remarks: Optional[str] = None
+    message: str
 
 
 class HoldingResponse(BaseModel):
-    id: int
+    hold_id: int
     student_id: str
     source_system: SourceSystem
     hold_type: HoldType
-    amount_due: float = Field(default=0.0, ge=0.0)
+    description: str
+    amount_due: float
     status: HoldStatus
-    remarks: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
+    created_at: str
 
 
-class StudentAffairsRecordRequest(BaseModel):
-    student_id: str = Field(..., pattern=r"^\d{4}-\d{5}$")
+class HoldingUpdateRequest(BaseModel):
+    student_id: str = Field(..., min_length=3, max_length=50)
+    source_system: SourceSystem
     hold_type: HoldType
     description: str = Field(..., min_length=3, max_length=255)
     amount_due: float = Field(default=0.0, ge=0.0)
 
 
+class ClearanceHoldBase(BaseModel):
+    student_id: str
+    source_system: SourceSystem
+    hold_type: HoldType
+    description: str
+    amount_due: float = 0.0
+
+
+class ClearanceHoldCreate(ClearanceHoldBase):
+    pass
+
+
+class ClearanceHoldUpdate(BaseModel):
+    status: Optional[HoldStatus] = None
+    description: Optional[str] = None
+    amount_due: Optional[float] = None
+
+
+class ClearanceHoldResponse(ClearanceHoldBase):
+    hold_id: int
+    status: HoldStatus
+    created_at: str
+    cleared_at: Optional[str] = None
+
+
+class AuditLogBase(BaseModel):
+    actor_user_id: int
+    action: str
+    entity_type: str
+    entity_id: int
+    old_values_json: Optional[str] = None
+    new_values_json: Optional[str] = None
+    ip_address: Optional[str] = None
+
+
+class AuditLogResponse(AuditLogBase):
+    audit_id: int
+    created_at: str
+
+
+class ImportLogBase(BaseModel):
+    source_system: SourceSystem
+    records_imported: int
+    imported_by: str
+    filename: str
+    status: str
+    message: Optional[str] = None
+
+
+class ImportLogResponse(ImportLogBase):
+    log_id: int
+    created_at: str
+
+
 class HealthResponse(BaseModel):
-    status: str = Field(default="ok")
-    service: str = Field(default="dnsc-eclearance-hub")
-    timestamp: datetime
-    database_status: str = Field(default="connected")
+    status: str
+    service: str
+    version: str
